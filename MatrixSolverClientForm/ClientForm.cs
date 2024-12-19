@@ -14,6 +14,8 @@ namespace MatrixSolverClientForm
 {
     public partial class ClientForm : Form
     {
+        private string serverUrl; // Server URL loaded from config.json
+
         private TabControl tabControl;
         private TabPage tabMain;
         private TabPage tabConversion;
@@ -43,7 +45,37 @@ namespace MatrixSolverClientForm
 
         public ClientForm()
         {
+            LoadConfiguration(); // Load server URL from config.json
             InitializeComponents();
+        }
+
+        private void LoadConfiguration()
+        {
+            try
+            {
+                string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory + "../../", "config.json");
+                if (!File.Exists(configPath))
+                {
+                    throw new FileNotFoundException("Файл config.json не найден.");
+                }
+
+                string configJson = File.ReadAllText(configPath);
+                var config = JsonSerializer.Deserialize<Dictionary<string, string>>(configJson);
+
+                if (config != null && config.TryGetValue("ServerUrl", out var url))
+                {
+                    serverUrl = url;
+                }
+                else
+                {
+                    throw new InvalidOperationException("URL сервера не найден в файле config.json.");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка загрузки конфигурации: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                serverUrl = "ws://localhost:5145/ws"; // Default to localhost
+            }
         }
 
         private void InitializeComponents()

@@ -18,7 +18,7 @@ namespace MatrixSolverServer
 
             app.Map("/ws", WebSocketHandler);
 
-            string serverUrl = "http://localhost:5145";
+            string serverUrl = "http://0.0.0.0:5145";
             Console.WriteLine($"Сервер запущен по адресу: {serverUrl}");
             app.Run(serverUrl);
         }
