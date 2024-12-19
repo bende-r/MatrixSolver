@@ -1,16 +1,49 @@
-﻿using System;
-using System.Threading.Tasks;
-
-using static MatrixSolverServer.Program;
-
-namespace MatrixSolverServer
+﻿namespace MatrixSolverServer
 {
-
     // Реализация сервиса
     public class SolverService : ISolverService
     {
         public double[] SolveSLAUWithStripeMultiplication(double[][] matrix, double[] vector)
         {
+            //ValidateMatrix(matrix, vector);
+
+            //int n = matrix.Length;
+            //double[] solution = new double[n];
+
+            //for (int k = 0; k < n - 1; k++)
+            //{
+            //    if (Math.Abs(matrix[k][k]) < 1e-10)
+            //        throw new ArgumentException("Нулевой элемент на диагонали. Решение невозможно.");
+
+            //    Parallel.For(k + 1, n, i =>
+            //    {
+            //        double factor = matrix[i][k] / matrix[k][k];
+            //        for (int j = k; j < n; j++)
+            //        {
+            //            matrix[i][j] -= factor * matrix[k][j];
+            //        }
+            //        vector[i] -= factor * vector[k];
+            //    });
+            //}
+
+            //for (int i = n - 1; i >= 0; i--)
+            //{
+            //    solution[i] = vector[i];
+            //    for (int j = i + 1; j < n; j++)
+            //    {
+            //        solution[i] -= matrix[i][j] * solution[j];
+            //    }
+            //    solution[i] /= matrix[i][i];
+            //}
+
+            //for (int i = 0; i < n; i++)
+            //{
+            //    solution[i] = Math.Round(solution[i], 7); // Округление до 7 знаков
+            //}
+
+
+            //return solution;
+
             ValidateMatrix(matrix, vector);
 
             int n = matrix.Length;
@@ -21,17 +54,36 @@ namespace MatrixSolverServer
                 if (Math.Abs(matrix[k][k]) < 1e-10)
                     throw new ArgumentException("Нулевой элемент на диагонали. Решение невозможно.");
 
-                Parallel.For(k + 1, n, i =>
+                List<ManualResetEvent> events = new List<ManualResetEvent>();
+
+                for (int i = k + 1; i < n; i++)
                 {
-                    double factor = matrix[i][k] / matrix[k][k];
-                    for (int j = k; j < n; j++)
+                    int currentRow = i;
+                    var resetEvent = new ManualResetEvent(false);
+                    events.Add(resetEvent);
+
+                    ThreadPool.QueueUserWorkItem(_ =>
                     {
-                        matrix[i][j] -= factor * matrix[k][j];
-                    }
-                    vector[i] -= factor * vector[k];
-                });
+                        double factor = matrix[currentRow][k] / matrix[k][k];
+                        for (int j = k; j < n; j++)
+                        {
+                            matrix[currentRow][j] -= factor * matrix[k][j];
+                        }
+                        vector[currentRow] -= factor * vector[k];
+                        resetEvent.Set(); // Signal completion
+                    });
+                }
+
+                // Process events in batches of 64
+                while (events.Count > 0)
+                {
+                    var batch = events.Take(64).ToArray();
+                    WaitHandle.WaitAll(batch);
+                    events.RemoveRange(0, batch.Length);
+                }
             }
 
+            // Back substitution
             for (int i = n - 1; i >= 0; i--)
             {
                 solution[i] = vector[i];
@@ -42,10 +94,13 @@ namespace MatrixSolverServer
                 solution[i] /= matrix[i][i];
             }
 
+            for (int i = 0; i < n; i++)
+            {
+                solution[i] = Math.Round(solution[i], 7); // Round to 7 decimals
+            }
+
             return solution;
         }
-
-
 
         public void ValidateMatrixRequest(MatrixRequest request)
         {
@@ -93,4 +148,3 @@ namespace MatrixSolverServer
         }
     }
 }
-

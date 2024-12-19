@@ -1,13 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Text.Json;
-using System.Windows.Forms;
+using System.Linq;
 using System.Net.WebSockets;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Linq;
+using System.Windows.Forms;
 
 namespace MatrixSolverClientForm
 {
@@ -79,7 +80,6 @@ namespace MatrixSolverClientForm
             };
         }
 
-
         private void InitializeMainTab()
         {
             Label lblMode = new Label { Text = "Выберите режим загрузки:", Left = 10, Top = 10, Width = 200 };
@@ -129,10 +129,6 @@ namespace MatrixSolverClientForm
             tabMain.Controls.Add(txtResult);
         }
 
-
-
-
-
         private void ToggleMode(object sender, EventArgs e)
         {
             bool isCombined = rbCombined.Checked;
@@ -143,7 +139,6 @@ namespace MatrixSolverClientForm
             txtCombinedFile.Enabled = isCombined;
             btnSelectCombined.Enabled = isCombined;
         }
-
 
         private async void BtnSend_Click(object sender, EventArgs e)
         {
@@ -235,22 +230,6 @@ namespace MatrixSolverClientForm
             }
         }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         private void InitializeConversionTab()
         {
             Label lblMatrixAFile = new Label { Text = "Файл матрицы (.A):", Left = 10, Top = 10, Width = 150 };
@@ -294,6 +273,12 @@ namespace MatrixSolverClientForm
             }
         }
 
+        public class ServerResponse
+        {
+            public double[] StripeSolution { get; set; }
+        }
+
+
         private async void BtnConvertAndCompare_Click(object sender, EventArgs e)
         {
             string matrixAFile = txtMatrixAFile.Text;
@@ -310,85 +295,147 @@ namespace MatrixSolverClientForm
 
             try
             {
-                // Чтение и конвертация файла .A
-                var matrix = File.ReadAllLines(matrixAFile)
-                    .Where(line => !string.IsNullOrWhiteSpace(line)) // Удаление пустых строк
-                    .Select(line =>
-                    {
-                        try
-                        {
-                            return line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
-                                       .Select(value => double.Parse(value, CultureInfo.InvariantCulture))
-                                       .ToArray();
-                        }
+                txtConversionResult.AppendText("Чтение файлов .A и .B...\r\n");
 
-                        catch
-                        {
-                            throw new FormatException($"Ошибка при разборе строки матрицы: \"{line}\"");
-                        }
-                    })
-                    .ToArray();
+                // Конвертация файлов .A и .B в JSON
+                double[][] matrix;
+                double[] vector;
 
-                // Чтение и конвертация файла .B
-                var vector = File.ReadAllLines(vectorBFile)
-                    .Where(line => !string.IsNullOrWhiteSpace(line)) // Удаление пустых строк
-                    .Select(value =>
-                    {
-                        try
-                        {
-                            return double.Parse(value, CultureInfo.InvariantCulture);
-                        }
-                        catch
-                        {
-                            throw new FormatException($"Ошибка при разборе строки вектора: \"{value}\"");
-                        }
-                    })
-                    .ToArray();
+                try
+                {
+                    // Stream-based reading for large .A files
+                    matrix = await ReadMatrixFromLargeFileAsync(matrixAFile);
+                    txtConversionResult.AppendText("Файл .A успешно прочитан.\r\n");
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Ошибка при чтении файла .A: {ex.Message}");
+                }
 
-                // Формирование JSON для отправки
+                try
+                {
+                    vector = File.ReadAllLines(vectorBFile)
+                        .Where(line => !string.IsNullOrWhiteSpace(line))
+                        .Select(value => double.Parse(value.Replace(',', '.'), CultureInfo.InvariantCulture)) // Учитываем формат чисел
+                        .ToArray();
+                    txtConversionResult.AppendText("Файл .B успешно прочитан.\r\n");
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Ошибка при чтении файла .B: {ex.Message}");
+                }
+
                 var data = new { Matrix = matrix, Vector = vector };
                 string jsonData = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
 
+                txtConversionResult.AppendText("Отправка данных на сервер...\r\n");
+
                 // Отправка на сервер
-                string serverResponse = await SendAndReceive(jsonData);
+                string serverResponse;
+                try
+                {
+                    serverResponse = await SendAndReceive(jsonData);
+                    txtConversionResult.AppendText("Данные успешно отправлены на сервер.\r\n");
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Ошибка при отправке данных на сервер: {ex.Message}");
+                }
+
+                txtConversionResult.AppendText("Обработка ответа сервера...\r\n");
 
                 // Чтение файла .DES
-                var expectedAnswers = File.ReadAllLines(answerDesFile)
-                    .Where(line => !string.IsNullOrWhiteSpace(line)) // Удаление пустых строк
-                    .Select(value =>
+                double[] expectedAnswers;
+                try
+                {
+                    expectedAnswers = File.ReadAllLines(answerDesFile)
+                        .Where(line => !string.IsNullOrWhiteSpace(line))
+                        .Select(value => double.Parse(value.Replace(',', '.'), CultureInfo.InvariantCulture)) // Учитываем формат чисел
+                        .ToArray();
+                    txtConversionResult.AppendText("Файл .DES успешно прочитан.\r\n");
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Ошибка при чтении файла .DES: {ex.Message}");
+                }
+
+                double[] actualAnswers;
+                try
+                {
+                    var response = JsonSerializer.Deserialize<ServerResponse>(serverResponse);
+
+                    if (response?.StripeSolution == null)
+                        throw new Exception("Ответ сервера не содержит решения StripeSolution.");
+
+                    actualAnswers = response.StripeSolution;
+                    txtConversionResult.AppendText("Ответ сервера успешно обработан.\r\n");
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Ошибка при десериализации ответа сервера: {ex.Message}\r\nОтвет сервера:\r\n{serverResponse}");
+                }
+
+                // Сравнение результатов с детальным анализом
+                txtConversionResult.Text = "Сравнение результатов:\r\n";
+                if (expectedAnswers.Length != actualAnswers.Length)
+                {
+                    txtConversionResult.AppendText("Результаты НЕ совпадают. Различная длина массивов.\r\n");
+                    txtConversionResult.AppendText($"Ожидаемая длина: {expectedAnswers.Length}, Фактическая длина: {actualAnswers.Length}\r\n");
+                }
+                else
+                {
+                    bool isEqual = true;
+                    for (int i = 0; i < expectedAnswers.Length; i++)
                     {
-                        try
+                        // Учет допустимой погрешности
+                        if (Math.Abs(expectedAnswers[i] - actualAnswers[i]) > 1e-4)
                         {
-                            return double.Parse(value, CultureInfo.InvariantCulture);
+                            isEqual = false;
+                            txtConversionResult.AppendText($"Разница на индексе {i}: Ожидаемое = {expectedAnswers[i]}, Фактическое = {actualAnswers[i]}\r\n");
                         }
-                        catch
-                        {
-                            throw new FormatException($"Ошибка при разборе строки ответа: \"{value}\"");
-                        }
-                    })
-                    .ToArray();
+                    }
 
-                // Сравнение результатов
-                var actualAnswers = JsonSerializer.Deserialize<double[]>(serverResponse);
-                bool isEqual = expectedAnswers.SequenceEqual(actualAnswers);
+                    if (isEqual)
+                    {
+                        txtConversionResult.AppendText("Результаты совпадают.\r\n");
+                    }
+                    else
+                    {
+                        txtConversionResult.AppendText("Результаты НЕ совпадают.\r\n");
+                    }
+                }
 
-                txtConversionResult.Text = isEqual
-                    ? "Результаты совпадают.\r\n"
-                    : "Результаты НЕ совпадают.\r\n";
-
-                txtConversionResult.AppendText("Ответ сервера:\r\n" + serverResponse + "\r\n");
+                // Вывод полного ответа сервера и ожидаемых значений
+                txtConversionResult.AppendText("\r\nОтвет сервера:\r\n" + string.Join(", ", actualAnswers) + "\r\n");
                 txtConversionResult.AppendText("Ожидаемые ответы:\r\n" + string.Join(", ", expectedAnswers));
-            }
-            catch (FormatException ex)
-            {
-                MessageBox.Show($"Ошибка формата данных: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Ошибка: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                txtConversionResult.AppendText($"Детали ошибки: {ex.Message}\r\n");
             }
         }
 
+        // Метод для чтения матрицы из большого файла построчно
+        private async Task<double[][]> ReadMatrixFromLargeFileAsync(string filePath)
+        {
+            var matrix = new List<double[]>();
+            using (var streamReader = new StreamReader(filePath))
+            {
+                string line;
+                while ((line = await streamReader.ReadLineAsync()) != null)
+                {
+                    if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        var row = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                                      .Select(value => double.Parse(value.Replace(',', '.'), CultureInfo.InvariantCulture))
+                                      .ToArray();
+                        matrix.Add(row);
+                    }
+                }
+            }
+            return matrix.ToArray();
+        }
 
         private async Task<string> SendAndReceive(string jsonData)
         {
@@ -422,7 +469,5 @@ namespace MatrixSolverClientForm
                 throw new Exception("Ошибка при отправке данных на сервер: " + ex.Message);
             }
         }
-
-
     }
 }

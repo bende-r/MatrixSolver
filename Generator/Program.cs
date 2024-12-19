@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Globalization;
 using System.IO;
 using System.Text.Json;
-
 
 namespace Generator
 {
@@ -10,92 +8,79 @@ namespace Generator
     {
         private static void Main(string[] args)
         {
-            int size = 3000; // Размерность матрицы и вектора
+            int size = 228; // Размерность матрицы и вектора
             string projectRootPath = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).Parent.Parent.FullName;
 
             // Пути для сохранения матрицы A и вектора B
-            string matrixFilePath = Path.Combine(projectRootPath, "a3000.json");
-            string vectorFilePath = Path.Combine(projectRootPath, "b3000.json");
-
-            // Генерация матрицы и вектора
-            double[,] matrix = GenerateMatrix(size);
-            double[] vector = GenerateVector(size);
+            string matrixFilePath = Path.Combine(projectRootPath, "a228.json");
+            string vectorFilePath = Path.Combine(projectRootPath, "b228.json");
 
             // Сохранение матрицы и вектора в JSON файлы
-            SaveMatrixToJson(matrix, matrixFilePath);
-            SaveVectorToJson(vector, vectorFilePath);
+            SaveMatrixToJson(size, matrixFilePath);
+            SaveVectorToJson(size, vectorFilePath);
 
             Console.WriteLine("Генерация завершена. Файлы сохранены.");
         }
 
-        // Генерация матрицы коэффициентов A размером size x size, исключая нули
-        private static double[,] GenerateMatrix(int size)
+        // Генерация и сохранение матрицы непосредственно в JSON файл
+        private static void SaveMatrixToJson(int size, string filePath)
         {
-            double[,] matrix = new double[size, size];
             Random rand = new Random();
 
-            for (int i = 0; i < size; i++)
+            using (var writer = new StreamWriter(filePath))
             {
-                for (int j = 0; j < size; j++)
+                writer.WriteLine("["); // Начало JSON массива
+                for (int i = 0; i < size; i++)
                 {
-                    double value = 0;
-                    // Генерация значений до тех пор, пока не получится ненулевое значение
-                    while (value == 0)
+                    writer.Write("[");
+                    for (int j = 0; j < size; j++)
+                    {
+                        double value;
+                        do
+                        {
+                            value = rand.NextDouble() * 100 - 50; // Значения от -50 до 50
+                        } while (value == 0);
+
+                        writer.Write(value.ToString("G", System.Globalization.CultureInfo.InvariantCulture));
+                        if (j < size - 1)
+                        {
+                            writer.Write(", ");
+                        }
+                    }
+                    writer.Write("]");
+                    if (i < size - 1)
+                    {
+                        writer.WriteLine(",");
+                    }
+                }
+                writer.WriteLine("]"); // Конец JSON массива
+            }
+        }
+
+        // Генерация и сохранение вектора непосредственно в JSON файл
+        private static void SaveVectorToJson(int size, string filePath)
+        {
+            Random rand = new Random();
+
+            using (var writer = new StreamWriter(filePath))
+            {
+                writer.WriteLine("["); // Начало JSON массива
+                for (int i = 0; i < size; i++)
+                {
+                    double value;
+                    do
                     {
                         value = rand.NextDouble() * 100 - 50; // Значения от -50 до 50
+                    } while (value == 0);
+
+                    writer.Write(value.ToString("G", System.Globalization.CultureInfo.InvariantCulture));
+                    if (i < size - 1)
+                    {
+                        writer.WriteLine(",");
                     }
-                    matrix[i, j] = value;
                 }
+                writer.WriteLine("]"); // Конец JSON массива
             }
-
-            return matrix;
-        }
-
-        // Генерация вектора правых частей B размером size, исключая нули
-        private static double[] GenerateVector(int size)
-        {
-            double[] vector = new double[size];
-            Random rand = new Random();
-
-            for (int i = 0; i < size; i++)
-            {
-                double value = 0;
-                // Генерация значений до тех пор, пока не получится ненулевое значение
-                while (value == 0)
-                {
-                    value = rand.NextDouble() * 100 - 50; // Значения от -50 до 50
-                }
-                vector[i] = value;
-            }
-
-            return vector;
-        }
-
-        // Сохранение матрицы в JSON файл
-        private static void SaveMatrixToJson(double[,] matrix, string filePath)
-        {
-            int rowCount = matrix.GetLength(0);
-            int colCount = matrix.GetLength(1);
-
-            double[][] matrixData = new double[rowCount][];
-            for (int i = 0; i < rowCount; i++)
-            {
-                matrixData[i] = new double[colCount];
-                for (int j = 0; j < colCount; j++)
-                {
-                    matrixData[i][j] = matrix[i, j];
-                }
-            }
-
-            string json = JsonSerializer.Serialize(matrixData, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(filePath, json);
-        }
-
-        // Сохранение вектора в JSON файл
-        private static void SaveVectorToJson(double[] vector, string filePath)
-        {
-            string json = JsonSerializer.Serialize(vector, new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(filePath, json);
         }
     }
 }

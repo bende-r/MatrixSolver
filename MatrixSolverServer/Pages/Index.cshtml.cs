@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace MatrixSolverServer.Pages
@@ -14,7 +13,6 @@ namespace MatrixSolverServer.Pages
 
         public void OnGet()
         {
-
         }
     }
 }

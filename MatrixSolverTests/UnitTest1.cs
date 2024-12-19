@@ -1,8 +1,4 @@
-using System;
-using Xunit;
 using MatrixSolverServer; // Директива для доступа к классу Solver
-using System.Collections.Generic;
-using static MatrixSolverServer.Program;
 
 public class MatrixSolverTests
 {
@@ -39,8 +35,6 @@ public class MatrixSolverTests
         AssertArraysEqual(expected, result);
     }
 
-   
-
     [Fact]
     public void SolveSLAU_IdentityMatrix_ReturnsSameVector()
     {
@@ -53,9 +47,9 @@ public class MatrixSolverTests
         var vector = new double[] { 5, -3, 10 };
 
         var stripeResult = _solverService.SolveSLAUWithStripeMultiplication(matrix, vector);
-       
+
         AssertArraysEqual(vector, stripeResult);
-          }
+    }
 
     [Fact]
     public void SolveSLAU_ZeroVector_ReturnsZeroVector()
@@ -70,13 +64,9 @@ public class MatrixSolverTests
         var expected = new double[] { 0, 0, 0 };
 
         var stripeResult = _solverService.SolveSLAUWithStripeMultiplication(matrix, vector);
-      
 
         AssertArraysEqual(expected, stripeResult);
-       
     }
-
-   
 
     [Fact]
     public void SolveSLAU_LargeValues_ReturnsCorrectSolution()
@@ -91,13 +81,10 @@ public class MatrixSolverTests
         var expected = new double[] { 1, 1, 1 };
 
         var stripeResult = _solverService.SolveSLAUWithStripeMultiplication(matrix, vector);
-       
 
         AssertArraysEqual(expected, stripeResult);
-       
     }
 
-   
     [Fact]
     public void ValidateMatrixRequest_EmptyMatrix_ThrowsException()
     {

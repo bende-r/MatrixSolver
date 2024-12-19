@@ -96,8 +96,8 @@
             socket.onmessage = (event) => {
                 const result = JSON.parse(event.data);
                 document.getElementById('result').textContent =
-                    `Решение ленточным методом: ${result.StripeSolution.join(', ')}\n` 
-                  
+                    `Решение ленточным методом: ${result.StripeSolution.join(', ')}\n`
+
                 socket.close();
             };
 

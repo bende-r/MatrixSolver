@@ -1,10 +1,6 @@
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
-using System.Diagnostics;
-using OpenTelemetry;
 
 namespace MatrixSolverServer
 {
@@ -37,7 +33,7 @@ namespace MatrixSolverServer
                 var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
                 logger.LogInformation("WebSocket соединение установлено.");
 
-                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5)); // Таймаут на 5 минут для сеанса
+                using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10)); // Таймаут на 5 минут для сеанса
                 try
                 {
                     var buffer = new ArraySegment<byte>(new byte[4096]);
